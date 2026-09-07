@@ -25,7 +25,7 @@
 import type { PoolConfig } from 'pg';
 
 export function resolvePgPoolConfig(): PoolConfig {
-  const url = process.env.DATABASE_URL;
+  const url = envStr('DATABASE_URL');
   if (url) {
     const sslDisabled = process.env.DATABASE_SSL === 'false';
     return {
@@ -36,12 +36,14 @@ export function resolvePgPoolConfig(): PoolConfig {
   // On a managed host (Render sets RENDER=true, Railway RAILWAY_*, Fly FLY_*)
   // there is no local Postgres to fall back to. Failing here with a clear
   // message beats a downstream `connect ECONNREFUSED 127.0.0.1:5432`.
-  if (isManagedHost() && !process.env.PGHOST) {
+  if (isManagedHost() && !envStr('PGHOST')) {
     throw new Error(
-      'DATABASE_URL is not set. On Render, open this service -> Environment, ' +
-        'add DATABASE_URL, and link it to your Postgres instance\'s Internal ' +
-        'Database URL (or re-create this service via the Blueprint so it is ' +
-        'wired from essential-db automatically).',
+      'DATABASE_URL is not set (or is empty) in this process. Postgres-related ' +
+        'env vars visible here: ' + visibleKeys(/^(DATABASE_URL|PG|POSTGRES)/i) +
+        '. On Render: this service -> Environment -> add DATABASE_URL as a ' +
+        'literal value = your Postgres instance\'s Internal Database URL, then ' +
+        'Save. A `fromService`/`fromDatabase` link is NOT reliable across plain ' +
+        'redeploys - use a literal value.',
     );
   }
   return {
@@ -69,10 +71,35 @@ function isManagedHost(): boolean {
   );
 }
 
+/** Env var names visible to this process that match a pattern - values are
+ *  never included so a password in DATABASE_URL is not logged. */
+function visibleKeys(pattern: RegExp): string {
+  const hits = Object.keys(process.env).filter((k) => pattern.test(k));
+  return hits.length ? hits.join(', ') : '(none)';
+}
+
+/** Trimmed non-empty string, or undefined. Render's Blueprint has been
+ *  observed to inject an env var whose value is an empty string or has a
+ *  trailing newline when a `fromService` reference fails to resolve. */
+function envStr(name: string): string | undefined {
+  const v = process.env[name];
+  if (v == null) return undefined;
+  const t = v.trim();
+  return t.length ? t : undefined;
+}
+
 export function resolveRedisConnection(): ResolvedRedisConnection {
-  const url = process.env.REDIS_URL;
+  const url = envStr('REDIS_URL');
   if (url) {
-    const parsed = new URL(url);
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error(
+        `REDIS_URL is set but not a valid URL: ${JSON.stringify(url)}. ` +
+          'Expected redis://host:port (or rediss://user:pass@host:port).',
+      );
+    }
     return {
       host: parsed.hostname,
       port: Number(parsed.port || 6379),
@@ -81,16 +108,19 @@ export function resolveRedisConnection(): ResolvedRedisConnection {
       tls: parsed.protocol === 'rediss:' ? {} : undefined,
     };
   }
-  if (isManagedHost() && !process.env.REDIS_HOST) {
+  const host = envStr('REDIS_HOST');
+  if (isManagedHost() && !host) {
     throw new Error(
-      'REDIS_URL is not set. On Render, open this service -> Environment, add ' +
-        'REDIS_URL, and link it to your Key Value instance\'s internal ' +
-        'connection string (or re-create this service via the Blueprint so it ' +
-        'is wired from essential-redis automatically).',
+      'REDIS_URL is not set (or is empty) in this process. Redis-related env ' +
+        'vars visible here: ' + visibleKeys(/REDIS/i) +
+        '. On Render: this service -> Environment -> add REDIS_URL as a literal ' +
+        'value (e.g. redis://red-xxxx:6379 from your Key Value instance\'s ' +
+        'internal URL), then Save. A `fromService` link is NOT reliable across ' +
+        'plain redeploys - use a literal value.',
     );
   }
   return {
-    host: process.env.REDIS_HOST ?? '127.0.0.1',
+    host: host ?? '127.0.0.1',
     port: Number(process.env.REDIS_PORT ?? 6379),
     username: process.env.REDIS_USERNAME || undefined,
     password: process.env.REDIS_PASSWORD || undefined,
