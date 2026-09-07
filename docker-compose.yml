@@ -1,0 +1,129 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: essential
+      POSTGRES_PASSWORD: essential_dev
+      POSTGRES_DB: essential
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U essential -d essential"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=8080
+      - LIVE_PUBLISH=false
+      - DATABASE_URL=${DATABASE_URL:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - HEYGEN_API_KEY=${HEYGEN_API_KEY:-}
+      - PEXELS_API_KEY=${PEXELS_API_KEY:-}
+      - UNSPLASH_API_KEY=${UNSPLASH_API_KEY:-}
+      - CLIPDROP_API_KEY=${CLIPDROP_API_KEY:-}
+      - LEONARDO_API_KEY=${LEONARDO_API_KEY:-}
+      - STABILITY_API_KEY=${STABILITY_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - META_APP_ID=${META_APP_ID:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - TIKTOK_CLIENT_KEY=${TIKTOK_CLIENT_KEY:-}
+      - TIKTOK_CLIENT_SECRET=${TIKTOK_CLIENT_SECRET:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      - PASSWORD_PEPPER=${PASSWORD_PEPPER:-}
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - PASSWORD_REQUIRE_SPECIAL=${PASSWORD_REQUIRE_SPECIAL:-true}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-24}
+      - RESET_TOKEN_TTL_MINUTES=${RESET_TOKEN_TTL_MINUTES:-30}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - REMEMBER_USERNAME_ENABLED=${REMEMBER_USERNAME_ENABLED:-true}
+      - POLLINATIONS_ENABLED=${POLLINATIONS_ENABLED:-true}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["npx", "tsx", "apps/worker/server.ts"]
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LIVE_PUBLISH=false
+      - DATABASE_URL=${DATABASE_URL:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - HEYGEN_API_KEY=${HEYGEN_API_KEY:-}
+      - PEXELS_API_KEY=${PEXELS_API_KEY:-}
+      - UNSPLASH_API_KEY=${UNSPLASH_API_KEY:-}
+      - CLIPDROP_API_KEY=${CLIPDROP_API_KEY:-}
+      - LEONARDO_API_KEY=${LEONARDO_API_KEY:-}
+      - STABILITY_API_KEY=${STABILITY_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - META_APP_ID=${META_APP_ID:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - TIKTOK_CLIENT_KEY=${TIKTOK_CLIENT_KEY:-}
+      - TIKTOK_CLIENT_SECRET=${TIKTOK_CLIENT_SECRET:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      - PASSWORD_PEPPER=${PASSWORD_PEPPER:-}
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - PASSWORD_REQUIRE_SPECIAL=${PASSWORD_REQUIRE_SPECIAL:-true}
+      - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-24}
+      - RESET_TOKEN_TTL_MINUTES=${RESET_TOKEN_TTL_MINUTES:-30}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - REMEMBER_USERNAME_ENABLED=${REMEMBER_USERNAME_ENABLED:-true}
+      - POLLINATIONS_ENABLED=${POLLINATIONS_ENABLED:-true}
+
+volumes:
+  redis-data:
+  pgdata:

@@ -1,0 +1,50 @@
+{
+  "name": "essential",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "@types/node": "^26.4.1",
+    "bullmq": "^6.3.4",
+    "core-util-is": "^1.0.3",
+    "docx": "^9.7.1",
+    "fastify": "^5.12.3",
+    "hash.js": "^1.1.7",
+    "immediate": "^3.0.6",
+    "inherits": "^2.0.4",
+    "ioredis": "^6.0.0",
+    "isarray": "^1.0.0",
+    "jszip": "^3.10.1",
+    "lie": "^3.3.0",
+    "minimalistic-assert": "^1.0.1",
+    "nanoid": "^5.1.16",
+    "pako": "^1.0.11",
+    "pg": "^8.23.0",
+    "process-nextick-args": "^2.0.1",
+    "readable-stream": "^2.3.8",
+    "safe-buffer": "^5.1.2",
+    "sax": "^1.6.1",
+    "setimmediate": "^1.0.5",
+    "string_decoder": "^1.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "undici-types": "^7.24.6",
+    "util-deprecate": "^1.0.2",
+    "xml": "^1.0.1",
+    "xml-js": "^1.6.11"
+  },
+  "scripts": {
+    "test": "npx tsx apps/api/roundtrip-test.ts",
+    "test:roundtrip": "npx tsx apps/api/roundtrip-test.ts",
+    "test:neo": "npx tsx apps/api/neo-test.ts",
+    "test:oauth": "npx tsx apps/api/oauth-test.ts",
+    "test:prod": "npx tsx apps/api/prod-test.ts",
+    "test:live": "npx tsx apps/api/live-integration-test.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

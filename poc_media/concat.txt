@@ -1,0 +1,2 @@
+file '/home/user/poc_media/opening_norm.mp4'
+file '/home/user/poc_media/training_norm.mp4'
