@@ -23,6 +23,9 @@ import type { EssentialQueues } from '../../apps/api/index';
 export interface LiveRedisConfig {
   readonly host: string;
   readonly port: number;
+  readonly username?: string;
+  readonly password?: string;
+  readonly tls?: Record<string, never>;
 }
 
 function sanitizeJobId(jobId?: string): string | undefined {
@@ -49,7 +52,13 @@ function wrapQueue(queue: Queue): EssentialQueues['research'] & {
 }
 
 export function createLiveQueues(redis: LiveRedisConfig): EssentialQueues {
-  const connection = { host: redis.host, port: redis.port };
+  const connection = {
+    host: redis.host,
+    port: redis.port,
+    username: redis.username,
+    password: redis.password,
+    tls: redis.tls,
+  };
   return {
     research: wrapQueue(new Queue('essential-research', { connection })),
     copy: wrapQueue(new Queue('essential-copy', { connection })),

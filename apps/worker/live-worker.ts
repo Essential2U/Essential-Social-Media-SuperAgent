@@ -48,7 +48,13 @@ export function startLiveWorkers(
     publish: new PublishWorker({ approvals: approvalsSM }),
   };
 
-  const connection = { host: redis.host, port: redis.port };
+  const connection = {
+    host: redis.host,
+    port: redis.port,
+    username: redis.username,
+    password: redis.password,
+    tls: redis.tls,
+  };
 
   const workers = [
     new Worker('essential-research', async (job) => processStrategy(ctx, job.data as never), {

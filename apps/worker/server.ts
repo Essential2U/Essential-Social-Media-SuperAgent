@@ -20,19 +20,14 @@ import { createPgDraftStore } from '../../packages/persistence';
 import type { DraftRecord } from '../../apps/api/index';
 import { startLiveWorkers } from './live-worker';
 import { createPgApprovalStateMachine } from '../../packages/approvals/pg';
+import { resolvePgPoolConfig, resolveRedisConnection } from '../../packages/core/db-config';
 
 async function main(): Promise<void> {
-  const redis = {
-    host: process.env.REDIS_HOST ?? '127.0.0.1',
-    port: Number(process.env.REDIS_PORT ?? 6379),
-  };
-  const pg = new Pool({
-    host: process.env.PGHOST ?? '127.0.0.1',
-    port: Number(process.env.PGPORT ?? 5432),
-    user: process.env.PGUSER ?? 'essential',
-    password: process.env.PGPASSWORD ?? 'essential_dev',
-    database: process.env.PGDATABASE ?? 'essential',
-  });
+  // Prefers DATABASE_URL / REDIS_URL (what every managed host - Render,
+  // Railway, Fly - hands you), falls back to discrete PGHOST/REDIS_HOST for
+  // local dev and docker-compose. See packages/core/db-config.ts.
+  const redis = resolveRedisConnection();
+  const pg = new Pool(resolvePgPoolConfig());
 
   // Persistence: Postgres-backed draft store (workers write results here).
   const drafts = createPgDraftStore<DraftRecord>(pg);

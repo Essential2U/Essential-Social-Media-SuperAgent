@@ -29,20 +29,15 @@ import Redis from 'ioredis';
 import { createLogger, parseLogLevel } from '../../packages/core/logger';
 import { createNeoEngine } from '../../packages/neo';
 import { createOAuthService } from '../../packages/oauth';
+import { resolvePgPoolConfig, resolveRedisConnection } from '../../packages/core/db-config';
 
 async function main(): Promise<void> {
   const port = Number(process.env.PORT ?? 8080);
-  const redis = {
-    host: process.env.REDIS_HOST ?? '127.0.0.1',
-    port: Number(process.env.REDIS_PORT ?? 6379),
-  };
-  const pg = new Pool({
-    host: process.env.PGHOST ?? '127.0.0.1',
-    port: Number(process.env.PGPORT ?? 5432),
-    user: process.env.PGUSER ?? 'essential',
-    password: process.env.PGPASSWORD ?? 'essential_dev',
-    database: process.env.PGDATABASE ?? 'essential',
-  });
+  // Prefers DATABASE_URL / REDIS_URL (what every managed host - Render,
+  // Railway, Fly - hands you), falls back to discrete PGHOST/REDIS_HOST for
+  // local dev and docker-compose. See packages/core/db-config.ts.
+  const redis = resolveRedisConnection();
+  const pg = new Pool(resolvePgPoolConfig());
 
   const logger = createLogger(parseLogLevel(process.env.LOG_LEVEL));
 
@@ -78,7 +73,7 @@ async function main(): Promise<void> {
   const queues = createLiveQueues(redis);
 
   // A3: Redis-backed login rate limiter shared across API replicas.
-  const redisLimiter = new Redis(redis.port, redis.host, { maxRetriesPerRequest: 1 });
+  const redisLimiter = new Redis({ ...redis, maxRetriesPerRequest: 1 });
   const rateLimiter = new RedisRateLimiter(redisLimiter, 60_000, 5);
 
   // M10 auth: JWT sessions + scrypt/pepper password policy.
@@ -108,7 +103,13 @@ async function main(): Promise<void> {
   });
 
   await app.listen({ port: port, host: '0.0.0.0' });
-  logger.info('essential api listening', { port, redis, pg: pg.options.database });
+  // Log only host/port - never the resolved redis/pg objects, which may carry
+  // a password when sourced from REDIS_URL/DATABASE_URL.
+  logger.info('essential api listening', {
+    port,
+    redis: { host: redis.host, port: redis.port },
+    pg: pg.options.database,
+  });
 
   // Graceful shutdown: close HTTP, then the Postgres pool.
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
