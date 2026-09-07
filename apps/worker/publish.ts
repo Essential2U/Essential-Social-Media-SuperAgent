@@ -38,6 +38,8 @@ export interface PublishOutcome {
   readonly gate: PublishGate;
   readonly published: readonly { platform: PlatformId; postId: string; postUrl: string }[];
   readonly skipped: readonly PlatformId[];
+  /** Why each skipped platform was skipped (e.g. "not connected", an adapter error). Keyed by platform. */
+  readonly skippedReasons: Readonly<Partial<Record<PlatformId, string>>>;
   readonly blocked: boolean;
 }
 
@@ -67,12 +69,14 @@ export class PublishWorker {
         gate,
         published: [],
         skipped: job.platforms,
+        skippedReasons: {},
         blocked: true,
       };
     }
 
     const published: { platform: PlatformId; postId: string; postUrl: string }[] = [];
     const skipped: PlatformId[] = [];
+    const skippedReasons: Partial<Record<PlatformId, string>> = {};
     for (const platform of job.platforms) {
       if (gate.perPlatform[platform] !== 'approved') {
         skipped.push(platform);
@@ -85,7 +89,23 @@ export class PublishWorker {
         if (stored) process.env[envKey] = stored.accessToken;
       }
       try {
-        const adapter = createAdapterFor(platform);
+        // Constraint #13: never publish to a platform without a connected
+        // credential - degrade gracefully, skip that platform, and log.
+        // Adapter construction is the only place credential absence is
+        // detected, so it gets its own catch: a failure here skips just this
+        // platform. A failure from adapter.publish() below (a real API/
+        // transient error on a platform that IS connected) is left to
+        // propagate and fail the job normally, preserving BullMQ retries.
+        let adapter: ReturnType<typeof createAdapterFor>;
+        try {
+          adapter = createAdapterFor(platform);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          skippedReasons[platform] = reason;
+          skipped.push(platform);
+          console.warn(`[publish:${job.draftId}] skipping ${platform} (not connected): ${reason}`);
+          continue;
+        }
         const result = await adapter.publish({
           contentVersion: job.contentVersion,
           approvedDraft: true,
@@ -102,7 +122,7 @@ export class PublishWorker {
       }
     }
 
-    return { jobId: job.jobId, draftId: job.draftId, gate, published, skipped, blocked: false };
+    return { jobId: job.jobId, draftId: job.draftId, gate, published, skipped, skippedReasons, blocked: false };
   }
 }
 

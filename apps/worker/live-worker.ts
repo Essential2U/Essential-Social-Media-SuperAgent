@@ -82,9 +82,17 @@ export function startLiveWorkers(
   ];
 
   // E4 fix: a failed job marks the draft failed (no silent dead jobs).
+  // Also log the underlying error - previously the draft flipped to 'failed'
+  // with zero trace of why, so diagnosing a production failure meant reaching
+  // into BullMQ's internal failed-job list by hand.
   for (const w of workers) {
     w.on('failed', (job, err) => {
       const draftId = (job?.data as { draftId?: string } | undefined)?.draftId;
+      console.error(
+        `[worker:${w.name}] job ${job?.id ?? '(unknown)'} failed` +
+          (draftId ? ` (draftId=${draftId})` : ''),
+        err,
+      );
       if (draftId) void drafts.update(draftId, { status: 'failed' });
     });
   }

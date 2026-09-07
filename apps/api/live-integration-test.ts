@@ -157,6 +157,10 @@ async function main(): Promise<void> {
   const pub = await app.inject({ method: 'POST', url: `/api/clients/live_001/drafts/${draftId}/publish` });
   assert(pub.statusCode === 202, 'live publish returns 202');
 
+  // publish is async (BullMQ publish worker) - poll until it lands, same as the
+  // copy/media steps above, instead of racing the worker with an immediate read.
+  await waitFor(() => store.get(draftId), (d) => d.status === 'published', 'publish worker persisted status');
+
   // 8. persisted in Postgres with final status
   const row = await pool.query<{ record: { status: string; previewUrls?: string[] } }>(
     'SELECT record FROM essential_drafts WHERE draft_id = $1',
