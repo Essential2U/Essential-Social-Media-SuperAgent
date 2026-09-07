@@ -1,0 +1,58 @@
+# --- Environment & secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Runtime data & logs ---
+*.log
+dump.rdb
+*.rdb
+
+# --- Generated / build artifacts ---
+dist/
+build/
+coverage/
+*.docx
+*.zip
+
+# --- Versioned snapshot copies (superseded by git history) ---
+essential-v1.9/
+essential-v1.10/
+essential-v1.11/
+
+# --- Scratch / test-output text files ---
+facebook_fallback_test.txt
+facebook_mock_test.txt
+mock_fallback_run.txt
+mock_run.txt
+mkdraft2.ts
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Sandbox / home environment (never commit) ---
+.bashrc
+.bash_logout
+.profile
+.gitconfig
+.cache/
+.config/
+.local/
+.opencode/
+.pm2/
+.genspark_env
+.genspark_llm.yaml
