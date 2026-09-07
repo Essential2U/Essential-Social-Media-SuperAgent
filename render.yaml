@@ -1,0 +1,144 @@
+# Render Blueprint - Essential (Social Media Super Agent)
+# Spec: https://render.com/docs/blueprint-spec
+#
+# Provisions 4 resources, wired together automatically:
+#   essential-redis   Key Value (Redis) - BullMQ queue backend
+#   essential-db      PostgreSQL       - drafts, auth, approvals, OAuth tokens
+#   essential-api     Web Service      - Fastify HTTP API (apps/api/server.ts)
+#   essential-worker  Background Worker - BullMQ processor (apps/worker/server.ts)
+#
+# BEFORE YOU DEPLOY - read this:
+#   1. REGION: every `region:` below must be the SAME value. Options: oregon,
+#      ohio, virginia, frankfurt, singapore. Default here is `virginia` - change
+#      all four if you want a different one.
+#   2. EXISTING REDIS: if you already created a Key Value instance by hand,
+#      delete it after this blueprint runs - this file provisions its own.
+#   3. Redis is reached over Render's INTERNAL network with no password and no
+#      TLS (apps/api/server.ts + apps/worker/server.ts read only REDIS_HOST /
+#      REDIS_PORT). That is why api, worker and redis must share one region.
+#   4. LIVE_PUBLISH stays "false" here. Only flip it to "true" after the M6
+#      test-account pass, and only with real JWT_SECRET / PASSWORD_PEPPER /
+#      TOOL_VAULT_KEY (Render generates those below).
+#
+# DEPLOY: Render dashboard -> New + -> Blueprint -> pick this repo -> Apply.
+
+databases:
+  - name: essential-db
+    databaseName: essential
+    user: essential
+    plan: basic-256mb
+    region: virginia
+
+services:
+  - type: keyvalue
+    name: essential-redis
+    plan: starter
+    region: virginia
+    maxmemoryPolicy: noeviction   # BullMQ job data must never be evicted
+    ipAllowList: []               # internal connections only, no public access
+
+  - type: web
+    name: essential-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: virginia
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: LIVE_PUBLISH
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: essential-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: essential-redis
+          property: port
+      - key: PGHOST
+        fromDatabase:
+          name: essential-db
+          property: host
+      - key: PGPORT
+        fromDatabase:
+          name: essential-db
+          property: port
+      - key: PGUSER
+        fromDatabase:
+          name: essential-db
+          property: user
+      - key: PGPASSWORD
+        fromDatabase:
+          name: essential-db
+          property: password
+      - key: PGDATABASE
+        fromDatabase:
+          name: essential-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PASSWORD_PEPPER
+        generateValue: true
+      - key: TOOL_VAULT_KEY
+        generateValue: true
+      - key: PASSWORD_MIN_LENGTH
+        value: "8"
+      - key: PASSWORD_REQUIRE_SPECIAL
+        value: "true"
+      - key: DEFAULT_LANGUAGE
+        value: en
+      - key: REMEMBER_USERNAME_ENABLED
+        value: "true"
+      - key: POLLINATIONS_ENABLED
+        value: "true"
+
+  - type: worker
+    name: essential-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: npx tsx apps/worker/server.ts
+    plan: starter
+    region: virginia
+    autoDeploy: true
+    envVars:
+      - key: LIVE_PUBLISH
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: essential-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: essential-redis
+          property: port
+      - key: PGHOST
+        fromDatabase:
+          name: essential-db
+          property: host
+      - key: PGPORT
+        fromDatabase:
+          name: essential-db
+          property: port
+      - key: PGUSER
+        fromDatabase:
+          name: essential-db
+          property: user
+      - key: PGPASSWORD
+        fromDatabase:
+          name: essential-db
+          property: password
+      - key: PGDATABASE
+        fromDatabase:
+          name: essential-db
+          property: database
