@@ -29,7 +29,7 @@ databases:
     region: virginia
 
 services:
-  - type: keyvalue
+  - type: redis
     name: essential-redis
     plan: starter
     region: virginia
@@ -57,7 +57,7 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: keyvalue
+          type: redis
           name: essential-redis
           property: connectionString
       - key: JWT_SECRET
@@ -96,6 +96,6 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: keyvalue
+          type: redis
           name: essential-redis
           property: connectionString
