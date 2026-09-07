@@ -33,6 +33,17 @@ export function resolvePgPoolConfig(): PoolConfig {
       ssl: sslDisabled ? undefined : { rejectUnauthorized: false },
     };
   }
+  // On a managed host (Render sets RENDER=true, Railway RAILWAY_*, Fly FLY_*)
+  // there is no local Postgres to fall back to. Failing here with a clear
+  // message beats a downstream `connect ECONNREFUSED 127.0.0.1:5432`.
+  if (isManagedHost() && !process.env.PGHOST) {
+    throw new Error(
+      'DATABASE_URL is not set. On Render, open this service -> Environment, ' +
+        'add DATABASE_URL, and link it to your Postgres instance\'s Internal ' +
+        'Database URL (or re-create this service via the Blueprint so it is ' +
+        'wired from essential-db automatically).',
+    );
+  }
   return {
     host: process.env.PGHOST ?? '127.0.0.1',
     port: Number(process.env.PGPORT ?? 5432),
@@ -50,6 +61,14 @@ export interface ResolvedRedisConnection {
   readonly tls?: Record<string, never>;
 }
 
+function isManagedHost(): boolean {
+  return Boolean(
+    process.env.RENDER ||
+      process.env.RAILWAY_ENVIRONMENT ||
+      process.env.FLY_APP_NAME,
+  );
+}
+
 export function resolveRedisConnection(): ResolvedRedisConnection {
   const url = process.env.REDIS_URL;
   if (url) {
@@ -61,6 +80,14 @@ export function resolveRedisConnection(): ResolvedRedisConnection {
       password: parsed.password || undefined,
       tls: parsed.protocol === 'rediss:' ? {} : undefined,
     };
+  }
+  if (isManagedHost() && !process.env.REDIS_HOST) {
+    throw new Error(
+      'REDIS_URL is not set. On Render, open this service -> Environment, add ' +
+        'REDIS_URL, and link it to your Key Value instance\'s internal ' +
+        'connection string (or re-create this service via the Blueprint so it ' +
+        'is wired from essential-redis automatically).',
+    );
   }
   return {
     host: process.env.REDIS_HOST ?? '127.0.0.1',
